@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimización de Ruta de Dron con Dijkstra</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #121212; /* Fondo oscuro */
+            color: #e0e0e0; /* Texto claro */
+        }
+        h1 {
+            color: #ffffff; /* Blanco para el título */
+        }
+        .container {
+            background-color: #1e1e1e; /* Fondo oscuro para el contenedor */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Sombra más oscura */
+        }
+        label {
+            font-weight: bold;
+            color: #e0e0e0; /* Texto claro para las etiquetas */
+        }
+        input[type="text"] {
+            padding: 8px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #333; /* Fondo oscuro para los inputs */
+            border: 1px solid #444; /* Borde más claro */
+            color: #e0e0e0; /* Texto claro */
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745; /* Verde para el botón */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838; /* Verde más oscuro al pasar el mouse */
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333; /* Fondo oscuro para el área de resultados */
+            border-radius: 5px;
+            color: #e0e0e0; /* Texto claro */
+        }
+        .graph-container {
+            margin-top: 20px;
+            width: 100%;
+            height: 500px; /* Aumentamos la altura para más nodos */
+            border: 1px solid #444; /* Borde más claro */
+            border-radius: 8px;
+            background-color: #1e1e1e; /* Fondo oscuro para el contenedor del grafo */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Optimización de Ruta de Dron con Dijkstra</h1>
+        <p>Ingresa el punto de inicio y destino para calcular la ruta óptima del dron.</p>
+        
+        <form id="routeForm">
+            <label for="start">Punto de Inicio:</label>
+            <input type="text" id="start" name="start" placeholder="Ej: A" required>
+            
+            <label for="end">Punto de Destino:</label>
+            <input type="text" id="end" name="end" placeholder="Ej: H" required>
+            
+            <button type="submit">Calcular Ruta</button>
+        </form>
+
+        <div class="result" id="result">
+            <!-- Aquí se mostrará el resultado -->
+        </div>
+
+        <div class="graph-container" id="graph"></div>
+    </div>
+
+    <!-- Incluir D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <script>
+        // Grafo ampliado con más nodos
+        const graph = {
+            'A': { 'B': 1, 'C': 4, 'D': 3 },
+            'B': { 'A': 1, 'C': 2, 'E': 7 },
+            'C': { 'A': 4, 'B': 2, 'D': 1, 'F': 5 },
+            'D': { 'A': 3, 'C': 1, 'G': 2 },
+            'E': { 'B': 7, 'F': 3, 'H': 4 },
+            'F': { 'C': 5, 'E': 3, 'G': 2, 'H': 1 },
+            'G': { 'D': 2, 'F': 2, 'H': 3 },
+            'H': { 'E': 4, 'F': 1, 'G': 3 }
+        };
+
+        // Función para implementar el algoritmo de Dijkstra
+        function dijkstra(graph, start, end) {
+            const queue = [{ node: start, cost: 0 }];
+            const distances = { [start]: 0 };
+            const previousNodes = {};
+
+            while (queue.length > 0) {
+                queue.sort((a, b) => a.cost - b.cost); // Ordenar por costo
+                const { node, cost } = queue.shift();
+
+                if (node === end) {
+                    const path = [];
+                    let currentNode = end;
+                    while (currentNode !== start) {
+                        path.unshift(currentNode);
+                        currentNode = previousNodes[currentNode];
+                    }
+                    path.unshift(start);
+                    return { path, cost };
+                }
+
+                for (const neighbor in graph[node]) {
+                    const newCost = cost + graph[node][neighbor];
+                    if (!distances[neighbor] || newCost < distances[neighbor]) {
+                        distances[neighbor] = newCost;
+                        previousNodes[neighbor] = node;
+                        queue.push({ node: neighbor, cost: newCost });
+                    }
+                }
+            }
+
+            return { path: [], cost: Infinity }; // Si no se encuentra una ruta
+        }
+
+        // Función para visualizar el grafo con D3.js
+        function visualizeGraph(graph, path = []) {
+            const width = 800; // Aumentamos el ancho para más nodos
+            const height = 500;
+
+            // Limpiar el contenedor del grafo
+            d3.select("#graph").html("");
+
+            // Crear un SVG dentro del contenedor
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // Convertir el grafo en un formato adecuado para D3
+            const nodes = Object.keys(graph).map(node => ({ id: node }));
+            const links = [];
+            for (const source in graph) {
+                for (const target in graph[source]) {
+                    links.push({ source, target, weight: graph[source][target] });
+                }
+            }
+
+            // Escala de fuerza para posicionar los nodos
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-200))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // Dibujar las aristas (líneas)
+            const link = svg.selectAll(".link")
+                .data(links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke", "#666") /* Color de las aristas más claro */
+                .attr("stroke-width", 2);
+
+            // Dibujar los nodos (círculos)
+            const node = svg.selectAll(".node")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", 15)
+                .attr("fill", d => path.includes(d.id) ? "#28a745" : "#666"); /* Color de los nodos más claro */
+
+            // Etiquetas de los nodos
+            const labels = svg.selectAll(".label")
+                .data(nodes)
+                .enter().append("text")
+                .attr("class", "label")
+                .text(d => d.id)
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "#e0e0e0"); /* Texto claro para las etiquetas */
+
+            // Actualizar la posición de los elementos en cada paso de la simulación
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                labels
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y);
+            });
+        }
+
+        // Visualizar el grafo inicial al cargar la página
+        visualizeGraph(graph);
+
+        // Manejar el envío del formulario
+        document.getElementById('routeForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const start = document.getElementById('start').value.toUpperCase();
+            const end = document.getElementById('end').value.toUpperCase();
+
+            if (!graph[start] || !graph[end]) {
+                document.getElementById('result').innerHTML = `<p>Error: Los nodos ingresados no existen en el grafo.</p>`;
+                return;
+            }
+
+            const { path, cost } = dijkstra(graph, start, end);
+
+            if (path.length === 0) {
+                document.getElementById('result').innerHTML = `<p>No se encontró una ruta válida entre ${start} y ${end}.</p>`;
+            } else {
+                document.getElementById('result').innerHTML = `
+                    <p><strong>Ruta óptima:</strong> ${path.join(' -> ')}</p>
+                    <p><strong>Consumo total de batería:</strong> ${cost}</p>
+                `;
+                // Visualizar el grafo con la ruta resaltada
+                visualizeGraph(graph, path);
+            }
+        });
+    </script>
+</body>
+</html>

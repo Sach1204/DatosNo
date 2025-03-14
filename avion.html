@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Tráfico Aéreo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #ffffff;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        label {
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+        input[type="text"] {
+            padding: 8px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #333;
+            border: 1px solid #444;
+            color: #e0e0e0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+        }
+        .graph-container {
+            margin-top: 20px;
+            width: 100%;
+            height: 500px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background-color: #1e1e1e;
+            position: relative;
+            overflow: hidden;
+        }
+        .node {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: #28a745;
+            border: 2px solid #218838;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .link {
+            position: absolute;
+            height: 2px;
+            background-color: #666;
+            transform-origin: 0% 0%;
+        }
+        .plane {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #ff5722;
+            border-radius: 50%;
+            transition: all 1s linear;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gestión de Tráfico Aéreo</h1>
+        <p>Ingresa el aeropuerto de inicio y destino para encontrar la ruta más corta.</p>
+        
+        <form id="routeForm">
+            <label for="start">Aeropuerto de Inicio:</label>
+            <input type="text" id="start" name="start" placeholder="Ej: A" required>
+            
+            <label for="end">Aeropuerto de Destino:</label>
+            <input type="text" id="end" name="end" placeholder="Ej: D" required>
+            
+            <button type="submit">Calcular Ruta</button>
+        </form>
+
+        <div class="result" id="result">
+            <!-- Aquí se mostrará la solución -->
+        </div>
+
+        <div class="graph-container" id="graph">
+            <!-- Aquí se dibujará el grafo -->
+        </div>
+
+        <button id="addNode">Agregar Nodo</button>
+        <button id="addEdge">Agregar Arista</button>
+    </div>
+
+    <script>
+        const graph = {
+            'A': { 'B': 1, 'C': 4 },
+            'B': { 'A': 1, 'C': 2, 'D': 5 },
+            'C': { 'A': 4, 'B': 2, 'D': 1 },
+            'D': { 'B': 5, 'C': 1 }
+        };
+
+        const nodePositions = {
+            'A': { x: 100, y: 100 },
+            'B': { x: 300, y: 100 },
+            'C': { x: 200, y: 300 },
+            'D': { x: 400, y: 300 }
+        };
+
+        function dijkstra(graph, start, end) {
+            const queue = [{ node: start, cost: 0 }];
+            const distances = { [start]: 0 };
+            const previousNodes = {};
+
+            while (queue.length > 0) {
+                queue.sort((a, b) => a.cost - b.cost);
+                const { node, cost } = queue.shift();
+
+                if (node === end) {
+                    const path = [];
+                    let currentNode = end;
+                    while (currentNode !== start) {
+                        path.unshift(currentNode);
+                        currentNode = previousNodes[currentNode];
+                    }
+                    path.unshift(start);
+                    return { path, cost };
+                }
+
+                for (const neighbor in graph[node]) {
+                    const newCost = cost + graph[node][neighbor];
+                    if (!distances[neighbor] || newCost < distances[neighbor]) {
+                        distances[neighbor] = newCost;
+                        previousNodes[neighbor] = node;
+                        queue.push({ node: neighbor, cost: newCost });
+                    }
+                }
+            }
+
+            return { path: [], cost: Infinity };
+        }
+
+        function drawGraph(graph, nodePositions, path = []) {
+            const graphContainer = document.getElementById('graph');
+            graphContainer.innerHTML = '';
+
+            for (const source in graph) {
+                for (const target in graph[source]) {
+                    const sourcePos = nodePositions[source];
+                    const targetPos = nodePositions[target];
+                    const distance = Math.sqrt(
+                        Math.pow(targetPos.x - sourcePos.x, 2) +
+                        Math.pow(targetPos.y - sourcePos.y, 2)
+                    );
+
+                    const angle = Math.atan2(targetPos.y - sourcePos.y, targetPos.x - sourcePos.x);
+
+                    const link = document.createElement('div');
+                    link.className = 'link';
+                    link.style.width = `${distance}px`;
+                    link.style.left = `${sourcePos.x}px`;
+                    link.style.top = `${sourcePos.y}px`;
+                    link.style.transform = `rotate(${angle}rad)`;
+                    graphContainer.appendChild(link);
+                }
+            }
+
+            for (const node in nodePositions) {
+                const nodeElement = document.createElement('div');
+                nodeElement.className = 'node';
+                nodeElement.style.left = `${nodePositions[node].x - 25}px`;
+                nodeElement.style.top = `${nodePositions[node].y - 25}px`;
+                nodeElement.textContent = node;
+                if (path.includes(node)) {
+                    nodeElement.style.backgroundColor = '#ff5722';
+                }
+                graphContainer.appendChild(nodeElement);
+            }
+        }
+
+        function animatePlane(path) {
+            const plane = document.createElement('div');
+            plane.className = 'plane';
+            document.getElementById('graph').appendChild(plane);
+
+            let index = 0;
+            function move() {
+                if (index >= path.length - 1) return;
+                const startNode = path[index];
+                const endNode = path[index + 1];
+                const startPos = nodePositions[startNode];
+                const endPos = nodePositions[endNode];
+
+                plane.style.left = `${endPos.x - 10}px`;
+                plane.style.top = `${endPos.y - 10}px`;
+
+                index++;
+                setTimeout(move, 1000);
+            }
+            move();
+        }
+
+        document.getElementById('routeForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const start = document.getElementById('start').value.toUpperCase();
+            const end = document.getElementById('end').value.toUpperCase();
+
+            if (!graph[start] || !graph[end]) {
+                document.getElementById('result').innerHTML = `<p>Error: Los aeropuertos ingresados no existen en el grafo.</p>`;
+                return;
+            }
+
+            const { path, cost } = dijkstra(graph, start, end);
+
+            if (path.length === 0) {
+                document.getElementById('result').innerHTML = `<p>No se encontró una ruta válida entre ${start} y ${end}.</p>`;
+            } else {
+                document.getElementById('result').innerHTML = `
+                    <p><strong>Ruta óptima:</strong> ${path.join(' -> ')}</p>
+                    <p><strong>Tiempo total de vuelo:</strong> ${cost} horas</p>
+                `;
+                drawGraph(graph, nodePositions, path);
+                animatePlane(path);
+            }
+        });
+
+        document.getElementById('addNode').addEventListener('click', function() {
+            const newNode = prompt("Ingresa el nombre del nuevo nodo:");
+            if (newNode && !graph[newNode]) {
+                graph[newNode] = {};
+                nodePositions[newNode] = { x: Math.random() * 400, y: Math.random() * 400 };
+                drawGraph(graph, nodePositions);
+            }
+        });
+
+        document.getElementById('addEdge').addEventListener('click', function() {
+            const fromNode = prompt("Ingresa el nodo de origen:");
+            const toNode = prompt("Ingresa el nodo de destino:");
+            const cost = parseFloat(prompt("Ingresa el costo de la arista:"));
+            if (fromNode && toNode && cost && graph[fromNode] && graph[toNode]) {
+                graph[fromNode][toNode] = cost;
+                drawGraph(graph, nodePositions);
+            }
+        });
+
+        drawGraph(graph, nodePositions);
+    </script>
+</body>
+</html>

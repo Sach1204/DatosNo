@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torres de Hanói</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #121212; /* Fondo oscuro */
+            color: #e0e0e0; /* Texto claro */
+        }
+        h1 {
+            color: #ffffff; /* Blanco para el título */
+        }
+        .container {
+            background-color: #1e1e1e; /* Fondo oscuro para el contenedor */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Sombra más oscura */
+        }
+        label {
+            font-weight: bold;
+            color: #e0e0e0; /* Texto claro para las etiquetas */
+        }
+        input[type="number"] {
+            padding: 8px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #333; /* Fondo oscuro para los inputs */
+            border: 1px solid #444; /* Borde más claro */
+            color: #e0e0e0; /* Texto claro */
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745; /* Verde para el botón */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838; /* Verde más oscuro al pasar el mouse */
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333; /* Fondo oscuro para el área de resultados */
+            border-radius: 5px;
+            color: #e0e0e0; /* Texto claro */
+            white-space: pre-wrap; /* Para mantener el formato de los pasos */
+        }
+        .towers {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .tower {
+            width: 30%;
+            height: 300px;
+            border-bottom: 5px solid #666; /* Base de la torre */
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            position: relative;
+        }
+        .disk {
+            height: 20px;
+            background-color: #28a745; /* Color de los discos */
+            border: 1px solid #218838; /* Borde de los discos */
+            border-radius: 5px;
+            margin: 2px 0;
+            position: relative;
+            transition: all 0.5s ease; /* Animación de movimiento */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Torres de Hanói</h1>
+        <p>Ingresa el número de discos para resolver el problema de las Torres de Hanói.</p>
+        
+        <form id="hanoiForm">
+            <label for="discos">Número de Discos:</label>
+            <input type="number" id="discos" name="discos" min="1" required>
+            
+            <button type="submit">Resolver</button>
+        </form>
+
+        <div class="result" id="result">
+            <!-- Aquí se mostrará la solución -->
+        </div>
+
+        <div class="towers" id="towers">
+            <div class="tower" id="towerA"></div>
+            <div class="tower" id="towerB"></div>
+            <div class="tower" id="towerC"></div>
+        </div>
+    </div>
+
+    <script>
+        // Función recursiva para resolver las Torres de Hanói
+        function hanoi(n, origen, destino, auxiliar, pasos) {
+            if (n === 1) {
+                pasos.push({ disk: n, from: origen, to: destino });
+            } else {
+                hanoi(n - 1, origen, auxiliar, destino, pasos);
+                pasos.push({ disk: n, from: origen, to: destino });
+                hanoi(n - 1, auxiliar, destino, origen, pasos);
+            }
+        }
+
+        // Función para crear los discos en la torre inicial
+        function createDisks(numDiscos, tower) {
+            tower.innerHTML = ''; // Limpiar la torre
+            for (let i = numDiscos; i >= 1; i--) {
+                const disk = document.createElement('div');
+                disk.className = 'disk';
+                disk.style.width = `${i * 20 + 20}px`; // El tamaño del disco depende de su número
+                disk.setAttribute('data-disk', i);
+                tower.appendChild(disk);
+            }
+        }
+
+        // Función para mover un disco de una torre a otra
+        function moveDisk(disk, fromTower, toTower) {
+            return new Promise((resolve) => {
+                const diskElement = fromTower.querySelector(`[data-disk="${disk}"]`);
+                toTower.appendChild(diskElement);
+                setTimeout(resolve, 500); // Esperar 500ms para la animación
+            });
+        }
+
+        // Manejar el envío del formulario
+        document.getElementById('hanoiForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const numDiscos = parseInt(document.getElementById('discos').value);
+
+            if (numDiscos < 1) {
+                document.getElementById('result').innerHTML = `<p>Por favor, ingresa un número válido de discos.</p>`;
+                return;
+            }
+
+            // Limpiar torres y resultado
+            document.getElementById('result').innerHTML = '';
+            const towerA = document.getElementById('towerA');
+            const towerB = document.getElementById('towerB');
+            const towerC = document.getElementById('towerC');
+            towerA.innerHTML = '';
+            towerB.innerHTML = '';
+            towerC.innerHTML = '';
+
+            // Crear los discos en la torre A
+            createDisks(numDiscos, towerA);
+
+            // Resolver el problema
+            const pasos = [];
+            hanoi(numDiscos, 'A', 'C', 'B', pasos);
+
+            // Mostrar los pasos y animar los movimientos
+            for (let i = 0; i < pasos.length; i++) {
+                const step = pasos[i];
+                const fromTower = document.getElementById(`tower${step.from}`);
+                const toTower = document.getElementById(`tower${step.to}`);
+
+                await moveDisk(step.disk, fromTower, toTower); // Esperar a que termine la animación
+                document.getElementById('result').innerHTML += `Mover disco ${step.disk} de Torre ${step.from} a Torre ${step.to}\n`;
+            }
+        });
+    </script>
+</body>
+</html>
