@@ -55,7 +55,7 @@
         .graph-container {
             margin-top: 20px;
             width: 100%;
-            height: 500px; /* Aumentamos la altura para más nodos */
+            height: 600px; /* Aumentamos la altura para más nodos */
             border: 1px solid #444; /* Borde más claro */
             border-radius: 8px;
             background-color: #1e1e1e; /* Fondo oscuro para el contenedor del grafo */
@@ -88,17 +88,21 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
 
     <script>
-        // Grafo ampliado con más nodos
+        // Grafo ampliado con más nodos y estaciones de recarga
         const graph = {
-            'A': { 'B': 1, 'C': 4, 'D': 3 },
-            'B': { 'A': 1, 'C': 2, 'E': 7 },
-            'C': { 'A': 4, 'B': 2, 'D': 1, 'F': 5 },
-            'D': { 'A': 3, 'C': 1, 'G': 2 },
-            'E': { 'B': 7, 'F': 3, 'H': 4 },
-            'F': { 'C': 5, 'E': 3, 'G': 2, 'H': 1 },
-            'G': { 'D': 2, 'F': 2, 'H': 3 },
-            'H': { 'E': 4, 'F': 1, 'G': 3 }
-        };
+    'A': { 'B': 1, 'C': 4, 'D': 3 }, // Nodo A conectado a B, C, D
+    'B': { 'A': 1, 'C': 2, 'E': 5 },  // Nodo B conectado a A, C, E
+    'C': { 'A': 4, 'B': 2, 'D': 1, 'F': 3 }, // Nodo C conectado a A, B, D, F
+    'D': { 'A': 3, 'C': 1, 'G': 2 },  // Nodo D conectado a A, C, G
+    'E': { 'B': 5, 'F': 2, 'H': 4 },  // Nodo E conectado a B, F, H
+    'F': { 'C': 3, 'E': 2, 'G': 1, 'I': 3 }, // Nodo F conectado a C, E, G, I
+    'G': { 'D': 2, 'F': 1, 'H': 3 },  // Nodo G conectado a D, F, H
+    'H': { 'E': 4, 'G': 3, 'I': 2 },  // Nodo H conectado a E, G, I
+    'I': { 'F': 3, 'H': 2, 'J': 4 }, // Nodo I conectado a F, H, J
+    'J': { 'I': 4 },                  // Nodo J conectado a I
+    'R1': { 'C': 2, 'F': 3 },         // Estación de recarga 1 conectada a C y F
+    'R2': { 'H': 2, 'I': 3 }          // Estación de recarga 2 conectada a H e I
+};
 
         // Función para implementar el algoritmo de Dijkstra
         function dijkstra(graph, start, end) {
@@ -134,10 +138,46 @@
             return { path: [], cost: Infinity }; // Si no se encuentra una ruta
         }
 
+        // Función para buscar la estación de recarga más cercana
+        function findNearestRechargeStation(graph, currentNode) {
+            const rechargeStations = ['R1', 'R2'];
+            let nearestStation = null;
+            let minCost = Infinity;
+
+            for (const station of rechargeStations) {
+                const { cost } = dijkstra(graph, currentNode, station);
+                if (cost < minCost) {
+                    minCost = cost;
+                    nearestStation = station;
+                }
+            }
+
+            return nearestStation;
+        }
+
+        // Función para calcular la ruta con recarga si es necesario
+        function calculateRouteWithRecharge(graph, start, end, batteryThreshold = 10) {
+            const { path, cost } = dijkstra(graph, start, end);
+
+            if (cost <= batteryThreshold) {
+                return { path, cost, recharge: false };
+            } else {
+                const nearestRecharge = findNearestRechargeStation(graph, start);
+                const { path: pathToRecharge, cost: costToRecharge } = dijkstra(graph, start, nearestRecharge);
+                const { path: pathFromRecharge, cost: costFromRecharge } = dijkstra(graph, nearestRecharge, end);
+
+                return {
+                    path: [...pathToRecharge, ...pathFromRecharge.slice(1)],
+                    cost: costToRecharge + costFromRecharge,
+                    recharge: true
+                };
+            }
+        }
+
         // Función para visualizar el grafo con D3.js
         function visualizeGraph(graph, path = []) {
-            const width = 800; // Aumentamos el ancho para más nodos
-            const height = 500;
+            const width = 1000; // Aumentamos el ancho para más nodos
+            const height = 600; // Aumentamos la altura para más nodos
 
             // Limpiar el contenedor del grafo
             d3.select("#graph").html("");
@@ -159,8 +199,8 @@
 
             // Escala de fuerza para posicionar los nodos
             const simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-                .force("charge", d3.forceManyBody().strength(-200))
+                .force("link", d3.forceLink(links).id(d => d.id).distance(150)) // Aumentamos la distancia entre nodos
+                .force("charge", d3.forceManyBody().strength(-300)) // Aumentamos la fuerza de repulsión
                 .force("center", d3.forceCenter(width / 2, height / 2));
 
             // Dibujar las aristas (líneas)
@@ -176,7 +216,7 @@
                 .data(nodes)
                 .enter().append("circle")
                 .attr("class", "node")
-                .attr("r", 15)
+                .attr("r", 10) // Reducimos el radio de los nodos
                 .attr("fill", d => path.includes(d.id) ? "#28a745" : "#666"); /* Color de los nodos más claro */
 
             // Etiquetas de los nodos
@@ -187,6 +227,7 @@
                 .text(d => d.id)
                 .attr("text-anchor", "middle")
                 .attr("dy", 5)
+                .attr("font-size", "12px") // Reducimos el tamaño de las etiquetas
                 .attr("fill", "#e0e0e0"); /* Texto claro para las etiquetas */
 
             // Actualizar la posición de los elementos en cada paso de la simulación
@@ -221,7 +262,7 @@
                 return;
             }
 
-            const { path, cost } = dijkstra(graph, start, end);
+            const { path, cost, recharge } = calculateRouteWithRecharge(graph, start, end);
 
             if (path.length === 0) {
                 document.getElementById('result').innerHTML = `<p>No se encontró una ruta válida entre ${start} y ${end}.</p>`;
@@ -229,6 +270,7 @@
                 document.getElementById('result').innerHTML = `
                     <p><strong>Ruta óptima:</strong> ${path.join(' -> ')}</p>
                     <p><strong>Consumo total de batería:</strong> ${cost}</p>
+                    ${recharge ? `<p><strong>Incluye recarga en estación:</strong> Sí</p>` : ''}
                 `;
                 // Visualizar el grafo con la ruta resaltada
                 visualizeGraph(graph, path);
